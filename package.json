@@ -11,12 +11,12 @@
   "author": "Benjamin Sobel",
   "license": "ISC",
   "dependencies": {
-    "nan": "^2.15.0"
+    "nan": "^2.16.0"
   },
   "devDependencies": {
     "node-gyp": "^7.1.2",
     "npm-watch": "^0.7.0",
-    "tree-sitter-cli": "^0.19.5"
+    "tree-sitter-cli": "^0.20.6"
   },
   "watch": {
     "test": {
