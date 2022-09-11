@@ -58,7 +58,6 @@ module.exports = grammar({
     name: 'dart',
 
     externals: $ => [
-        $._automatic_semicolon,
         $._template_chars_double,
         $._template_chars_single,
         $._template_chars_double_single,
@@ -88,6 +87,7 @@ module.exports = grammar({
     inline: $ => [
         $._ambiguous_name,
         $._class_member_definition,
+        $._if_null_expression,
     ],
 
     conflicts: $ => [
@@ -162,7 +162,7 @@ module.exports = grammar({
         [$._type_not_void],
         [$._type_not_void_not_function],
         [$.super_formal_parameter, $.unconditional_assignable_selector],
-        [$.function_signature]
+        [$.function_signature],
     ],
 
     word: $ => $.identifier,
@@ -179,7 +179,8 @@ module.exports = grammar({
             // The precedence here is to make sure that this rule is matched before any of the _statement rules are matched for testing.
             repeat(prec.dynamic(22, seq(optional($._metadata), $._top_level_definition))),
             //for testing:
-            repeat($._statement)
+            repeat($._statement),
+            optional($._expression),
         ),
 
         // Page 187 topLevelDefinition
@@ -1046,14 +1047,13 @@ module.exports = grammar({
             $.identifier,
             $.new_expression,
             $.const_object_expression,
-            seq('(', $._expression, ')'),
+            $.parenthesized_expression,
             // $.class_literal,
             $.this,
             seq(
                 $.super,
                 $.unconditional_assignable_selector
             )
-            // $.parenthesized_expression,
             // $.object_creation_expression,
             // $.field_access,
             // $.array_access,
@@ -1125,8 +1125,12 @@ module.exports = grammar({
             $._assignment_operator,
             $._expression_without_cascade
         ),
+        index_selector: $ => seq('[', $._expression, ']'),
         cascade_selector: $ => choice(
-            seq(optional($._nullable_type), '[', $._expression, ']'),
+            seq(
+                optional($._nullable_type),
+                $.index_selector,
+            ),
             $.identifier
         ),
         argument_part: $ => seq(
@@ -1141,7 +1145,10 @@ module.exports = grammar({
         ),
 
         unconditional_assignable_selector: $ => choice(
-            seq(optional($._nullable_type), '[', $._expression, ']'),
+            seq(
+                optional($._nullable_type),
+                $.index_selector,
+            ),
             seq('.', $.identifier)
         ),
 
@@ -1225,15 +1232,23 @@ module.exports = grammar({
 
         assert_statement: $ => seq($.assertion, ';'),
 
-        assertion: $ => seq($._assert_builtin, '(', $._expression, 
+        assertion: $ => seq(
+            $._assert_builtin,
+            $.assertion_arguments,
+        ),
+
+        assertion_arguments: $ => seq(
+            '(',
+            $._expression,
             optional(
                 seq(
                     ',',
                     $._expression
-                )
+                ),
             ),
             optional(','),
-            ')'),
+            ')',
+        ),
 
         switch_statement: $ => seq(
             'switch',
@@ -1311,18 +1326,21 @@ module.exports = grammar({
         ),
         catch_clause: $ => seq(
             'catch',
+            $.catch_parameters,
+            // field('body', $.block)
+        ),
+
+        catch_parameters: $ => seq(
             '(',
             $.identifier,
             optional(
                 seq(
                     ',',
                     $.identifier
-                )
+                ),
             ),
             ')',
-            // field('body', $.block)
         ),
-
 
         // catch_formal_parameter: $ => seq(
         //     optional($._metadata),
@@ -1358,11 +1376,11 @@ module.exports = grammar({
         for_statement: $ => seq(
             optional('await'),
             'for',
-            '(',
-            $._for_loop_parts,
-            ')',
+            $.for_loop_parts,
             field('body', $._statement)
         ),
+
+        for_loop_parts: $ => seq('(', $._for_loop_parts, ')'),
 
         _for_loop_parts: $ => choice(
             seq(
@@ -1390,9 +1408,7 @@ module.exports = grammar({
         for_element: $ => seq(
             optional('await'),
             'for',
-            '(',
-            $._for_loop_parts,
-            ')',
+            $.for_loop_parts,
             field('body', $._element)
         ),
 
@@ -1530,11 +1546,11 @@ module.exports = grammar({
 
         configuration_uri: $ => seq(
             'if',
-            '(',
-            $.uri_test,
-            ')',
+            $.configuration_uri_condition,
             $.uri
         ),
+
+        configuration_uri_condition: $ => seq('(', $.uri_test, ')'),
 
         uri_test: $ => seq(
             $.dotted_identifier_list,
@@ -2688,7 +2704,7 @@ module.exports = grammar({
 
         label: $ => seq($.identifier, ':'),
 
-        _semicolon: $ => seq(';'),
+        _semicolon: $ => token(';'),
 
         identifier: $ => /[a-zA-Z_$][\w$]*/,
         identifier_dollar_escaped: $ => /([a-zA-Z_]|(\\\$))([\w]|(\\\$))*/,
